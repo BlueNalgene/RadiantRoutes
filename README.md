@@ -3,6 +3,16 @@ Calculations for solar irradiation of migratory birds in flight.
 
 ## Requirements/Prerequisites
 
+### Important Hardware Note
+
+The design of SMARTS is heavily reliant on repeatedly moving files in the same
+location on the disk. This can cause disk failures on certain types of systems
+due to high frequency re-writing of the same sector. If you intend to run a
+ridiculous number of entries, you should check that you are using appropriate
+hardware like an enterprise-grade HDD, an adequate SSD, or other modern
+hardware. If you are running an older HDD or an SD card for some reason, you
+run a greater risk of sector issues.
+
 ### SMARTS 2.9.5+
 
 The ``SMARTS`` module contains functions for calling SMARTS: Simple Model of the

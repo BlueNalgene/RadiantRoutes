@@ -18,18 +18,23 @@ __maintainer__ = "Wesley T. Honeycutt"
 __email__ = "honeycutt@ou.edu"
 __status__ = "alpha"
 
-
+from glob import glob
+import os
 import pandas as pd
-# import numpy as np
+import shutil
+import subprocess
 import xarray as xr
+
 
 class procSMARTS:
     """
     Manage the SMARTS calls
     """
     indf = None
+    runid = None
     log = None
     pwd = None
+    outarray = None
     # Storage for the name listed in the df header
     dfc = {\
         "hyr":None, \
@@ -63,7 +68,7 @@ class procSMARTS:
         "hrh":None, \
     }
 
-    def __init__(self, indf, dfhd, pwd, log=None):
+    def __init__(self, indf, runid, dfhd, pwd, log=None):
         """
         | Initializes the SMARTS processor
 
@@ -72,6 +77,7 @@ class procSMARTS:
         indf : Pandas dataframe
         """
         self.indf = indf
+        self.runid = runid
         self.dfc["hyr"] = dfhd["dfyear"]
         self.dfc["hmon"] = dfhd["dfmon"]
         self.dfc["hday"] = dfhd["dfday"]
@@ -208,10 +214,10 @@ class procSMARTS:
                 + str(self.dfv["hlat"]) + ' ' \
                 + str(self.dfv["hlon"]) + ' 0'
 
-            self.write_inp(idx_zstr, inp, self.log)
+            self.write_inp(idx_zstr, inp)
         return
 
-    def write_inp(self, idx_zstr, inp, log=None):
+    def write_inp(self, idx_zstr, inp):
         """
         | Write the INP to a file in the correct directory
 
@@ -222,6 +228,127 @@ class procSMARTS:
         inp : string
             content of INP file generated from this class
         """
-        with open(self.pwd + "/data/smarts_inp/" + idx_zstr + ".inp.txt", 'w') as outfile:
+        with open(self.pwd + "/data/smarts_inp/" + self.runid + '_' + idx_zstr + ".inp.txt", 'w') as outfile:
             outfile.write(inp)
+            if self.log: self.log.info(f"created {self.runid + '_' + idx_zstr}.inp.txt")
         return
+
+    def file_path(self, path):
+        """
+        | Check that the os.path is actually a file.  Else raises an error.
+
+        Parameters
+        ----------
+        path : string
+        stringlike path to check
+
+        Returns
+        -------
+        path : string
+        stringlike path to file
+        """
+        # requires = ["os"]
+        # for i in requires: check_import(i, log=log)
+        if not os.path.isfile(path):
+            if self.log:
+                self.log.error(f"readable_file:{path} is not a valid to a file")
+            else:
+                raise RuntimeError(f"readable_file:{path} is not a valid to a file")
+        return os.path.abspath(path)
+
+    def run_smarts(self):
+        """
+        | This runs the SMARTS batch script. This has some quirks as a legacy
+        | program. Files will have to be switched back and forth while the
+        | working directory is held constant.
+
+        Parameters
+        ----------
+        """
+        # Get all inp files
+        inplist = glob(self.pwd + "/data/smarts_inp/" + self.runid + "_*.inp.txt")
+        inplist.sort()
+        if self.log: self.log.debug(f"all inp files: {inplist}")
+
+        # Clear out any old files
+        try:
+            os.remove(self.pwd + "/SMARTS/smarts295.out.txt")
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove(self.pwd + "/SMARTS/smarts295.ext.txt")
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove(self.pwd + "/SMARTS/smarts295.scn.txt")
+        except FileNotFoundError:
+            pass
+
+        self.outarray = []
+
+        # Change working directory to SMARTS
+        os.chdir(self.pwd + "/SMARTS/")
+        try:
+            # Cycle through input files
+            for inp in inplist:
+                #TODO this is linux-only currently
+                fileid = inp.split('/')[-1].split(".inp.txt")[0]
+                try:
+                    self.file_path(inp)
+                except RuntimeError:
+                    self.outarray.append(-1)
+                    continue
+                shutil.copyfile(inp, self.pwd + "/SMARTS/smarts295.inp.txt")
+
+                #TODO this is linux-only right now.
+                subprocess.run(self.pwd + "/SMARTS/smarts295bat")
+                with open(self.pwd + "/SMARTS/smarts295.out.txt", 'r', encoding="ISO-8859-1") as outfile:
+                    found = False
+                    zenith = False
+                    turbid = False
+                    for row in outfile:
+                        if "Terrestrial = " in row:
+                            irr = row.split('=')[2].replace(' ', '').split('A')[0]
+                            self.outarray.append(irr)
+                            if self.log: self.log.info(f"Calculated IRR={irr} successfully.")
+                            found = True
+                        elif "> 90 deg. RUN ABORTED!" in row:
+                            zenith = True
+                            if self.log: self.log.info(f"Zenith angle low, nighttime.  Setting to -2")
+                        elif "turbidity is too large" in row:
+                            turbid = True
+                            if self.log: self.log.info(f"Turbidity problem in file, setting to -3")
+                    if found == False:
+                        if zenith == True:
+                            self.outarray.append(-2)
+                        elif turbid == True:
+                            self.outarray.append(-3)
+                        else:
+                            self.outarray.append(-4)
+                    # Move these files into our output storage space
+                    try:
+                        shutil.move(self.pwd + "/SMARTS/smarts295.out.txt", \
+                        self.pwd + "/data/smarts_out/" + fileid + ".out.txt")
+                    except FileNotFoundError:
+                        pass
+                    try:
+                        shutil.move(self.pwd + "/SMARTS/smarts295.ext.txt", \
+                        self.pwd + "/data/smarts_out/" + fileid + ".ext.txt")
+                    except FileNotFoundError:
+                        pass
+                    try:
+                        shutil.move(self.pwd + "/SMARTS/smarts295.scn.txt", \
+                        self.pwd + "/data/smarts_out/" + fileid + ".scn.txt")
+                    except FileNotFoundError:
+                        pass
+        finally:
+            # Return to original working directory
+            os.chdir(self.pwd)
+            if self.log: self.log.info(f"Done with SMARTS loop")
+            if self.log: self.log.debug(f"Output array: {self.outarray}")
+            with open(self.pwd + "SMARTS_irr.csv", 'w') as outfile:
+                outfile.write("SMARTSirr\n")
+                for entry in self.outarray:
+                    outfile.write(str(entry))
+                    outfile.write('\n')
+            if self.log: self.log.info(f"Saved as {self.pwd + "SMARTS_irr.csv"}")

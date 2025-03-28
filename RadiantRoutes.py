@@ -117,6 +117,13 @@ def arg_parsing():
         type=arg_file_path, \
         help="Path to input csv file", \
     )
+    # Optional runid, must be 8 characters_max
+    parser.add_argument("-8", "--runid", \
+        required=False, \
+        type=arg_capstr, \
+        default="BIRDIRR", \
+        help="String identifier for this run, 8 char max!", \
+    )
     # ## Input directory path; requires DEF-dir_path and os
     # parser.add_argument("inpath", type=arg_dir_path,\
     #     help="Path to *directory* files")
@@ -151,6 +158,23 @@ def arg_parsing():
     args = parser.parse_args()
     return args
 
+def arg_capstr(instr):
+    """
+    | Sanitize the input ID string from args.
+
+    Parameters
+    ----------
+    instr : string
+        input string from arg parser
+
+    Returns
+    -------
+    outstr : string
+        8 character allcaps string
+    """
+    outstr = "{:>08}".format(instr[:8].upper())
+    return outstr
+
 def arg_dir_path(path):
     """
     | Check that the os.path is actually a directory.  Else raises an error.
@@ -158,12 +182,12 @@ def arg_dir_path(path):
     Parameters
     ----------
     path : string
-    stringlike path to check
+        stringlike path to check
 
     Returns
     -------
     path : string
-    stringlike path
+        stringlike path
     """
     if not os.path.isdir(path):
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
@@ -179,12 +203,12 @@ def arg_file_path(path):
     Parameters
     ----------
     path : string
-    stringlike path to check
+        stringlike path to check
 
     Returns
     -------
     path : string
-    stringlike path to file
+        stringlike path to file
     """
     if not os.path.isfile(path):
         raise argparse.ArgumentTypeError(f"readable_file:{path} is not a valid to a file")
@@ -243,8 +267,9 @@ def main():
     df_checker(indf, log=logger)
 
     # Load the SMARTS processor and create files
-    procsmarts = procSMARTS(indf, DFHD, PWD, log=logger)
+    procsmarts = procSMARTS(indf, args.runid, DFHD, PWD, log=logger)
     procsmarts.create_inps()
+    procsmarts.run_smarts()
 
     return
 
