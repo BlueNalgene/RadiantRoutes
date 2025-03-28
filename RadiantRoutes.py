@@ -27,7 +27,6 @@ import sys
 # Packages Imported by RRvenv
 
 # Local Packages
-from src.downloadAODVIIRS import downloadAODVIIRS
 from src.procSMARTS import procSMARTS
 # WTH custom logging class added in another file called "fancylog.py"
 from src.fancylog import FancyLog

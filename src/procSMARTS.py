@@ -346,7 +346,7 @@ class procSMARTS:
             os.chdir(self.pwd)
             if self.log: self.log.info(f"Done with SMARTS loop")
             if self.log: self.log.debug(f"Output array: {self.outarray}")
-            with open(self.pwd + "SMARTS_irr.csv", 'w') as outfile:
+            with open(self.pwd + "/SMARTS_irr.csv", 'w') as outfile:
                 outfile.write("SMARTSirr\n")
                 for entry in self.outarray:
                     outfile.write(str(entry))
