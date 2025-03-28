@@ -183,3 +183,7 @@ cython_debug/
 .directory
 # Kate swp files
 *.kate-swp
+# My logs
+*.log
+# Test data
+*.csv
