@@ -172,3 +172,14 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# User Ignores
+# SMARTS files
+*.inp.txt
+*.out.txt
+*.ext.txt
+*.scn.txt
+# Dolphin .directory file
+.directory
+# Kate swp files
+*.kate-swp
